@@ -36,6 +36,19 @@ const environmentMapTexture = cubeTextureLoader.load([
 const world = new CANNON.World();
 world.gravity.set(0, -9.82, 0); //gravity VEC3 (x, y, z)
 
+const defaultMaterial = new CANNON.Material("default");
+
+const defaultContactMaterial = new CANNON.ContactMaterial(
+  defaultMaterial,
+  defaultMaterial,
+  {
+    friction: 0.1,
+    restitution: 0.7,
+  }
+);
+world.addContactMaterial(defaultContactMaterial);
+world.defaultContactMaterial = defaultContactMaterial;
+
 //Body
 const sphereShape = new CANNON.Sphere(0.5); //SphereShape (radius)
 const sphereBody = new CANNON.Body({
@@ -43,6 +56,10 @@ const sphereBody = new CANNON.Body({
   position: new CANNON.Vec3(0, 3, 0),
   shape: sphereShape,
 });
+// sphereBody.applyLocalForce(
+//   new CANNON.Vec3(150, 0, 0),
+//   new CANNON.Vec3(0, 0, 0)
+// );
 world.addBody(sphereBody);
 
 //Floor
@@ -56,18 +73,18 @@ world.addBody(floorBody);
 /**
  * Test sphere
  */
-const sphere = new THREE.Mesh(
-  new THREE.SphereGeometry(0.5, 32, 32),
-  new THREE.MeshStandardMaterial({
-    metalness: 0.3,
-    roughness: 0.4,
-    envMap: environmentMapTexture,
-    envMapIntensity: 0.5,
-  })
-);
-sphere.castShadow = true;
-sphere.position.y = 0.5;
-scene.add(sphere);
+// const sphere = new THREE.Mesh(
+//   new THREE.SphereGeometry(0.5, 32, 32),
+//   new THREE.MeshStandardMaterial({
+//     metalness: 0.3,
+//     roughness: 0.4,
+//     envMap: environmentMapTexture,
+//     envMapIntensity: 0.5,
+//   })
+// );
+// sphere.castShadow = true;
+// sphere.position.y = 0.5;
+// scene.add(sphere);
 
 /**
  * Floor
@@ -153,6 +170,36 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setSize(sizes.width, sizes.height);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
+const objectsToUpdate = [];
+
+//Utils
+const createSphere = (radius, position) => {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 20, 20),
+    new THREE.MeshStandardMaterial({
+      metalness: 0.3,
+      roughness: 0.4,
+      envMap: environmentMapTexture,
+    })
+  );
+  mesh.castShadow = true;
+  mesh.position.copy(position);
+  scene.add(mesh);
+
+  const shape = new CANNON.Sphere(radius);
+  const body = new CANNON.Body({
+    mass: 1,
+    position: new CANNON.Vec3(position.x, position.y, position.z),
+    shape,
+    material: defaultMaterial,
+  });
+  world.addBody(body);
+
+  objectsToUpdate.push({ mesh, body });
+};
+
+createSphere(0.5, new THREE.Vector3(0, 3, 0));
+
 /**
  * Animate
  */
@@ -167,7 +214,9 @@ const tick = () => {
   // Update physics world
   world.step(1 / 60, deltaTime, 3); //dt, iterations, friction
 
-  sphere.position.copy(sphereBody.position);
+  for (const object of objectsToUpdate) {
+    object.mesh.position.copy(object.body.position);
+  }
 
   // Update controls
   controls.update();
