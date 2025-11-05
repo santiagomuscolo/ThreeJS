@@ -17,6 +17,19 @@ const canvas = document.querySelector("canvas.webgl");
 // Scene
 const scene = new THREE.Scene();
 
+//Sounds
+const hitSound = new Audio("/sounds/hit.mp3");
+
+const playHitSound = (collision) => {
+  const impactStrength = collision.contact.getImpactVelocityAlongNormal();
+
+  if (impactStrength > 1.5) {
+    hitSound.volume = Math.random();
+    hitSound.currentTime = 0;
+    hitSound.play();
+  }
+};
+
 /**
  * Textures
  */
@@ -34,6 +47,8 @@ const environmentMapTexture = cubeTextureLoader.load([
 
 //Physics
 const world = new CANNON.World();
+world.broadphase = new CANNON.SAPBroadphase(world);
+world.allowSleep = true;
 world.gravity.set(0, -9.82, 0); //gravity VEC3 (x, y, z)
 
 const defaultMaterial = new CANNON.Material("default");
@@ -172,16 +187,18 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 const objectsToUpdate = [];
 
+//Sphere
+const sphereGeomtry = new THREE.SphereGeometry(1, 20, 20);
+const sphereMaterial = new THREE.MeshStandardMaterial({
+  metalness: 0.3,
+  roughness: 0.4,
+  envMap: environmentMapTexture,
+});
+
 //Utils
 const createSphere = (radius, position) => {
-  const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 20, 20),
-    new THREE.MeshStandardMaterial({
-      metalness: 0.3,
-      roughness: 0.4,
-      envMap: environmentMapTexture,
-    })
-  );
+  const mesh = new THREE.Mesh(sphereGeomtry, sphereMaterial);
+  mesh.scale.set(radius, radius, radius);
   mesh.castShadow = true;
   mesh.position.copy(position);
   scene.add(mesh);
@@ -193,12 +210,74 @@ const createSphere = (radius, position) => {
     shape,
     material: defaultMaterial,
   });
+  body.position.copy(position);
+  body.addEventListener("collide", playHitSound);
   world.addBody(body);
 
   objectsToUpdate.push({ mesh, body });
 };
 
-createSphere(0.5, new THREE.Vector3(0, 3, 0));
+//Box
+const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+const boxMaterial = new THREE.MeshStandardMaterial({
+  metalness: 0.3,
+  roughness: 0.4,
+  envMap: environmentMapTexture,
+});
+const createBox = (width, height, depth, position) => {
+  const mesh = new THREE.Mesh(boxGeometry, boxMaterial);
+  mesh.scale.set(width, height, depth);
+  mesh.castShadow = true;
+  mesh.position.copy(position);
+  scene.add(mesh);
+
+  const shape = new CANNON.Box(
+    new CANNON.Vec3(width * 0.5, height * 0.5, depth * 0.5)
+  );
+  const body = new CANNON.Body({
+    mass: 1,
+    position: new CANNON.Vec3(position.x, position.y, position.z),
+    shape,
+    material: defaultMaterial,
+  });
+  body.position.copy(position);
+  body.addEventListener("collide", playHitSound);
+  world.addBody(body);
+
+  objectsToUpdate.push({ mesh, body });
+};
+
+/**
+ * GUI Controls
+ */
+const guiControls = {
+  createSphere: () => {
+    createSphere(
+      0.5,
+      new THREE.Vector3((Math.random() - 0.5) * 3, 3, (Math.random() - 0.5) * 3)
+    );
+  },
+  createBox: () => {
+    createBox(
+      0.5,
+      0.5,
+      0.5,
+      new THREE.Vector3((Math.random() - 0.5) * 3, 3, (Math.random() - 0.5) * 3)
+    );
+  },
+  reset: () => {
+    for (const object of objectsToUpdate) {
+      object.body.removeEventListener("collide", playHitSound);
+      world.removeBody(object.body);
+      scene.remove(object.mesh);
+    }
+    objectsToUpdate.length = 0;
+  },
+};
+
+gui.add(guiControls, "createSphere").name("Crear Esfera");
+gui.add(guiControls, "createBox").name("Crear Caja");
+gui.add(guiControls, "reset").name("Remover Objetos");
 
 /**
  * Animate
@@ -216,6 +295,7 @@ const tick = () => {
 
   for (const object of objectsToUpdate) {
     object.mesh.position.copy(object.body.position);
+    object.mesh.quaternion.copy(object.body.quaternion);
   }
 
   // Update controls
