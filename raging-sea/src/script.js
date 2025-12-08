@@ -24,13 +24,14 @@ const scene = new THREE.Scene();
  * Water
  */
 // Geometry
-const waterGeometry = new THREE.PlaneGeometry(2, 2, 128, 128);
+const waterGeometry = new THREE.PlaneGeometry(20, 20, 128, 128);
 
 // Material
 const waterMaterial = new THREE.ShaderMaterial({
   vertexShader: waterVertexShader,
   fragmentShader: waterFragmentShader,
-  wireframe: true,
+  // wireframe: true,
+  side: THREE.DoubleSide,
   uniforms: {
     uBigWavesElevation: { value: 0.2 },
     uBigWavesFrequency: { value: new THREE.Vector2(4, 1.5) },
@@ -41,6 +42,11 @@ const waterMaterial = new THREE.ShaderMaterial({
     uSurfaceColor: { value: new THREE.Color(debugObject.surfaceColor) },
     uColorOffset: { value: 0.08 },
     uColorMultiplier: { value: 5 },
+
+    uSmallWavesElevation: { value: 0.15 },
+    uSmallWavesFrequency: { value: 3 },
+    uSmallWavesSpeed: { value: 0.2 },
+    uSmallIterations: { value: 4.0 },
   },
 });
 
@@ -124,7 +130,8 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   100
 );
-camera.position.set(1, 1, 1);
+camera.position.set(0, 3, 3);
+camera.lookAt(0, 0, 0);
 scene.add(camera);
 
 // Controls
